@@ -3,6 +3,29 @@ const generateShootPlan = (
 ) => {
 
   const grouped = {};
+  const uniqueActors = [
+  ...new Set(
+    scenes.flatMap(
+      scene => scene.actors || []
+    )
+  )
+];
+
+const uniqueProps = [
+  ...new Set(
+    scenes.flatMap(
+      scene => scene.props || []
+    )
+  )
+];
+
+const uniqueCostumes = [
+  ...new Set(
+    scenes.flatMap(
+      scene => scene.costumes || []
+    )
+  )
+];
 
   scenes.forEach(scene => {
 
@@ -55,6 +78,8 @@ const generateShootPlan = (
 
         location,
 
+        scenes,
+
         sceneNumbers:
           scenes.map(
             scene =>
@@ -67,7 +92,11 @@ const generateShootPlan = (
         averageComplexity:
           avgComplexity,
 
-        recommendation
+        recommendation,
+        
+        actors: uniqueActors,
+props: uniqueProps,
+costumes: uniqueCostumes,
 
       };
 

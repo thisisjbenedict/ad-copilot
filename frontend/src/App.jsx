@@ -53,12 +53,79 @@ function App() {
   const scenes = uploadResponse?.analysis?.scenes ?? [];
   const shootPlan = uploadResponse?.analysis ?.shootPlan || [];
   
+  const [searchTerm, setSearchTerm] =
+  useState("");
+
+const [sortMode, setSortMode] =
+  useState("count");
+
+const [expandedActor, setExpandedActor] =
+  useState(null);
+
+const [expandedLocation, setExpandedLocation] =
+  useState(null);
+
+const [expandedProp, setExpandedProp] =
+  useState(null);
+
+const [expandedShootDay, setExpandedShootDay] =
+  useState(null);
+
+  const [selectedScene,
+  setSelectedScene] =
+  useState(null);
+
+  const [expandedSection,
+  setExpandedSection] =
+  useState(null);
 
   const actors = getUniqueActors(scenes);
   const props = getUniqueProps(scenes);
   const costumes = getUniqueCostumes(scenes);
   const locations = getUniqueLocations(scenes);
   const locationGroups = getLocationGroups(scenes);
+
+  const sortedActors =
+  [...actors]
+    .filter(actor =>
+      actor
+        .toLowerCase()
+        .includes(
+          searchTerm.toLowerCase()
+        )
+    )
+    .sort((a,b)=>{
+
+      if(sortMode==="az")
+        return a.localeCompare(b);
+
+      if(sortMode==="za")
+        return b.localeCompare(a);
+
+      return (
+        getActorScenes(
+          scenes,
+          b
+        ).length -
+        getActorScenes(
+          scenes,
+          a
+        ).length
+      );
+
+    });
+
+    const getPropScenes = (
+  prop,
+  scenes
+) => {
+
+  return scenes.filter(
+    scene =>
+      scene.props?.includes(prop)
+  );
+
+};
 
 
   const handleUpload = async () => {
@@ -249,6 +316,39 @@ function App() {
         </Tab>
 
       </section>
+      <div className="toolbar">
+
+  <input
+    className="search-input"
+    type="text"
+    placeholder="Search actors, locations, props..."
+    value={searchTerm}
+    onChange={(e) =>
+      setSearchTerm(e.target.value)
+    }
+  />
+
+  <select
+    className="sort-select"
+    value={sortMode}
+    onChange={(e) =>
+      setSortMode(e.target.value)
+    }
+  >
+    <option value="count">
+      Most Used
+    </option>
+
+    <option value="az">
+      A → Z
+    </option>
+
+    <option value="za">
+      Z → A
+    </option>
+  </select>
+
+</div>
 
       <main className="content">
 
@@ -282,23 +382,67 @@ function App() {
 
   <>
 
-    {actors.map((actor) => (
+    {sortedActors.map(actor => {
 
-      <ItemCard
-        key={actor}
-        left="🎭"
-        title={actor}
-        sub={
-  `Appears in ${
-    getActorScenes(
-      scenes,
-      actor
-    ).length
-  } scenes`
-}
-      />
+  const actorScenes =
+  getActorScenes(
+    scenes,
+    actor
+  );
 
-    ))}
+  return (
+
+    <div
+      key={actor}
+      className="item-card clickable"
+      onClick={() =>
+        setExpandedActor(
+          expandedActor === actor
+            ? null
+            : actor
+        )
+      }
+    >
+
+      <div className="item-main">
+
+        <div className="item-title">
+          🎭 {actor}
+        </div>
+
+        <div className="item-sub">
+          Appears in {actorScenes.length} scenes
+        </div>
+
+        {
+          expandedActor === actor &&
+          (
+            <div className="tag-container">
+
+              {
+                actorScenes.map(scene => (
+
+                  <span
+                    key={scene.sceneNumber}
+                    className="tag"
+                  >
+                    Scene {scene.sceneNumber}
+                  </span>
+
+                ))
+              }
+
+            </div>
+          )
+        }
+
+      </div>
+
+    </div>
+
+  );
+
+})}
 
   </>
 
@@ -308,26 +452,74 @@ function App() {
 
   <>
 
-    {locations.map((location) => {
+   {locations.map(location => {
 
-      const count =
-        scenes.filter(
-          scene =>
-            scene.location === location
-        ).length;
+  const locationScenes =
+    scenes.filter(
+      scene =>
+        scene.location === location
+    );
 
-      return (
+  return (
 
-        <ItemCard
-          key={location}
-          left="📍"
-          title={location}
-          sub={`${count} scenes`}
-        />
+    <div
+      key={location}
+      className="item-card clickable"
+      onClick={() =>
+        setExpandedLocation(
+          expandedLocation === location
+            ? null
+            : location
+        )
+      }
+    >
 
-      );
+      <div className="item-main">
 
-    })}
+        <div className="item-title">
+          📍 {location}
+        </div>
+
+        <div className="item-sub">
+          Used in {locationScenes.length} scenes
+        </div>
+
+        {
+          expandedLocation === location &&
+          (
+            <div className="tag-container">
+
+              {
+                locationScenes.map(scene => (
+
+                  <span
+                    key={scene.sceneNumber}
+                    className="tag"
+                    onClick={(e) => {
+
+    e.stopPropagation();
+
+    setSelectedScene(scene);
+
+  }}
+                  >
+                    Scene {scene.sceneNumber}
+                  </span>
+
+                ))
+              }
+
+            </div>
+          )
+        }
+
+      </div>
+
+    </div>
+
+  );
+
+})}
 
   </>
 
@@ -337,26 +529,67 @@ function App() {
 
   <>
 
-    {props.map((prop) => {
+    {props.map(prop => {
 
-      const count =
-        scenes.filter(
-          scene =>
-            scene.props.includes(prop)
-        ).length;
+  const propScenes =
+    getPropScenes(
+      prop,
+      scenes
+    );
 
-      return (
+  return (
 
-        <ItemCard
-          key={prop}
-          left="📦"
-          title={prop}
-          sub={`Used in ${count} scenes`}
-        />
+    <div
+      key={prop}
+      className="item-card clickable"
+      onClick={() =>
+        setExpandedProp(
+          expandedProp === prop
+            ? null
+            : prop
+        )
+      }
+    >
 
-      );
+      <div className="item-main">
 
-    })}
+        <div className="item-title">
+          🎬 {prop}
+        </div>
+
+        <div className="item-sub">
+          Used in {propScenes.length} scenes
+        </div>
+
+        {
+          expandedProp === prop &&
+          (
+            <div className="tag-container">
+
+              {
+                propScenes.map(scene => (
+
+                  <span
+                    key={scene.sceneNumber}
+                    className="tag"
+                  >
+                    Scene {scene.sceneNumber}
+                  </span>
+
+                ))
+              }
+
+            </div>
+          )
+        }
+
+      </div>
+
+    </div>
+
+  );
+
+})}
 
   </>
 
@@ -366,49 +599,280 @@ function App() {
 
   <div className="shoot-grid">
 
-    {shootPlan.map(day => (
+    {shootPlan.map((day, index) => {
+
+  const dayKey =
+    `day-${index}`;
+
+  const expanded =
+    expandedShootDay === dayKey;
+
+  return (
+
+    <div
+      key={dayKey}
+      className="card shoot-card"
+    >
 
       <div
-        key={day.day}
-        className="card"
+        className="shoot-header"
+        onClick={() =>
+          setExpandedShootDay(
+            expanded
+              ? null
+              : dayKey
+          )
+        }
       >
 
         <h3>
-          Day {day.day}
+          Day {index + 1}
         </h3>
 
-        <p>
-          📍 {day.location}
-        </p>
-<p>
-  🎬 Scenes:
-  {" "}
-  {day.sceneNumbers.join(", ")}
-</p>
-
-<p>
-  📊 Total Scenes:
-  {" "}
-  {day.totalScenes}
-</p>
-
-<p>
-  ⚡ Avg Complexity:
-  {" "}
-  {day.averageComplexity}
-</p>
-
-<p>
-  💡 {day.recommendation}
-</p>
+        <span>
+          {day.location}
+        </span>
 
       </div>
 
-    ))}
+      {
+        expanded &&
+        (
+          <>
+
+            {/* SCENES */}
+
+            <div
+              className="shoot-section"
+              onClick={() =>
+                setExpandedSection(
+                  expandedSection ===
+                  `${dayKey}-scenes`
+                    ? null
+                    : `${dayKey}-scenes`
+                )
+              }
+            >
+
+              ▼ Scenes
+
+            </div>
+
+            {
+              expandedSection ===
+              `${dayKey}-scenes`
+              &&
+              (
+                <div className="tag-container">
+
+                  {
+                    day.scenes.map(
+                      scene => (
+
+                        <span
+                          key={
+                            scene.sceneNumber
+                          }
+                          className="tag"
+                        >
+                          Scene {
+                            scene.sceneNumber
+                          }
+                        </span>
+
+                      )
+                    )
+                  }
+
+                </div>
+              )
+            }
+
+            {/* ACTORS */}
+
+            <div
+              className="shoot-section"
+              onClick={() =>
+                setExpandedSection(
+                  expandedSection ===
+                  `${dayKey}-actors`
+                    ? null
+                    : `${dayKey}-actors`
+                )
+              }
+            >
+
+              ▼ Actors
+
+            </div>
+
+            {
+              expandedSection ===
+              `${dayKey}-actors`
+              &&
+              (
+                <div className="tag-container">
+
+                  {
+                    [
+                      ...new Set(
+                        day.scenes.flatMap(
+                          scene =>
+                            scene.actors || []
+                        )
+                      )
+                    ].map(actor => (
+
+                      <span
+                        key={actor}
+                        className="tag"
+                      >
+                        {actor}
+                      </span>
+
+                    ))
+                  }
+
+                </div>
+              )
+            }
+
+            {/* PROPS */}
+
+            <div
+              className="shoot-section"
+              onClick={() =>
+                setExpandedSection(
+                  expandedSection ===
+                  `${dayKey}-props`
+                    ? null
+                    : `${dayKey}-props`
+                )
+              }
+            >
+
+              ▼ Props
+
+            </div>
+
+            {
+              expandedSection ===
+              `${dayKey}-props`
+              &&
+              (
+                <div className="tag-container">
+
+                  {
+                    [
+                      ...new Set(
+                        day.scenes.flatMap(
+                          scene =>
+                            scene.props || []
+                        )
+                      )
+                    ].map(prop => (
+
+                      <span
+                        key={prop}
+                        className="tag"
+                      >
+                        {prop}
+                      </span>
+
+                    ))
+                  }
+
+                </div>
+              )
+            }
+
+          </>
+        )
+      }
+
+    </div>
+
+  );
+
+})}
 
   </div>
 
 )}
+
+<aside className="inspector">
+
+    {selectedScene ? (
+
+      <>
+        <h3>
+          Scene {selectedScene.sceneNumber}
+        </h3>
+
+        <p className="inspector-title">
+          {selectedScene.title}
+        </p>
+
+        <div className="inspector-block">
+          <strong>Location</strong>
+          <p>{selectedScene.location}</p>
+        </div>
+
+        <div className="inspector-block">
+          <strong>Complexity</strong>
+          <p>
+            {selectedScene.complexityScore}/10
+          </p>
+        </div>
+
+        <div className="inspector-block">
+          <strong>Actors</strong>
+
+          <div className="tag-container">
+            {selectedScene.actors?.map(actor => (
+              <span
+                key={actor}
+                className="tag"
+              >
+                {actor}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="inspector-block">
+          <strong>Props</strong>
+
+          <div className="tag-container">
+            {selectedScene.props?.map(prop => (
+              <span
+                key={prop}
+                className="tag"
+              >
+                {prop}
+              </span>
+            ))}
+          </div>
+        </div>
+
+      </>
+
+    ) : (
+
+      <div className="empty-inspector">
+
+        <h3>Scene Inspector</h3>
+
+        <p>
+          Select a scene tag to inspect
+          details.
+        </p>
+
+      </div>
+
+    )}
+
+  </aside>
 
       </main>
 

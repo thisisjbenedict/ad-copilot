@@ -330,3 +330,173 @@ button:hover {
   margin-top: 4px;
 
 }
+
+.tag-container {
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-top: 8px;
+
+  margin-bottom: 12px;
+}
+
+.tag {
+
+  background: #1f2937;
+
+  border: 1px solid #374151;
+
+  color: #e5e7eb;
+
+  padding: 4px 10px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+}
+
+.toolbar {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:24px;
+}
+
+.search-input {
+  flex:1;
+  max-width:500px;
+
+  background:#111827;
+  border:1px solid #233045;
+
+  color:white;
+
+  padding:12px 16px;
+
+  border-radius:12px;
+}
+
+.sort-select {
+  background:#111827;
+  border:1px solid #233045;
+
+  color:white;
+
+  padding:12px;
+
+  border-radius:12px;
+}
+
+.tag-container {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+
+  margin-top:16px;
+}
+
+.tag {
+  background:#172234;
+
+  border:1px solid #284160;
+
+  color:#dbeafe;
+
+  padding:6px 12px;
+
+  border-radius:999px;
+
+  font-size:13px;
+}
+
+.clickable {
+  cursor:pointer;
+}
+.shoot-card {
+  margin-bottom: 16px;
+}
+
+.shoot-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+
+  cursor:pointer;
+}
+
+.shoot-section {
+  margin-top:16px;
+
+  font-weight:600;
+
+  cursor:pointer;
+}
+
+.scene-inspector {
+  margin-top:32px;
+
+  background:#111827;
+
+  border:1px solid #233045;
+
+  border-radius:16px;
+
+  padding:24px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.workspace-content {
+  min-width: 0;
+}
+
+.inspector {
+  position: sticky;
+  top: 24px;
+
+  height: fit-content;
+
+  background: #0f1724;
+
+  border: 1px solid #233045;
+
+  border-radius: 16px;
+
+  padding: 24px;
+}
+
+.inspector-title {
+  font-size: 18px;
+  font-weight: 600;
+
+  margin-bottom: 20px;
+}
+
+.inspector-block {
+  margin-bottom: 24px;
+}
+
+.empty-inspector {
+  color: #94a3b8;
+}
+
+@media (max-width: 1100px) {
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .inspector {
+    position: static;
+  }
+
+}
