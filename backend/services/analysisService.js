@@ -117,9 +117,6 @@ analysis.shootPlan =
   generateShootPlan(
     analysis.scenes
   );
-  
-
-  console.log(analysis);
 
 return analysis;
 

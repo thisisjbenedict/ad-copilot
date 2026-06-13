@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { uploadScript } from "./services/scriptService";
+import { API_URL } from "./config/api";
+
 import {
   getUniqueActors,
   getUniqueProps,
@@ -50,6 +52,36 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("scenes");
 
+const [expandedShootSection, setExpandedShootSection] =
+  useState({});
+
+  const [currentPage,
+setCurrentPage] =
+useState(1);
+
+  const ITEMS_PER_PAGE = {
+  scenes: 10,
+  actors: 12,
+  locations: 12,
+  props: 12
+};
+
+  const toggleShootSection = (
+  dayId,
+  section
+) => {
+
+  const key =
+    `${dayId}-${section}`;
+
+  setExpandedShootSection(
+    expandedShootSection === key
+      ? null
+      : key
+  );
+
+};
+
   const scenes = uploadResponse?.analysis?.scenes ?? [];
   const shootPlan = uploadResponse?.analysis ?.shootPlan || [];
   
@@ -71,19 +103,313 @@ const [expandedProp, setExpandedProp] =
 const [expandedShootDay, setExpandedShootDay] =
   useState(null);
 
-  const [selectedScene,
-  setSelectedScene] =
-  useState(null);
+  const getComplexityClass = (
+  score
+) => {
+
+  if (score <= 3)
+    return "easy";
+
+  if (score <= 6)
+    return "medium";
+
+  return "hard";
+};
+
+const getDaySummary = (day) => {
+
+  const actors =
+    [...new Set(
+      day.scenes.flatMap(
+        s => s.actors || []
+      )
+    )];
+
+  const props =
+    [...new Set(
+      day.scenes.flatMap(
+        s => s.props || []
+      )
+    )];
+
+  const permissions =
+    [...new Set(
+      day.scenes.flatMap(
+        s =>
+          s.specialRequirements || []
+      )
+    )];
+
+  const avgComplexity =
+    Math.round(
+      day.scenes.reduce(
+        (sum, scene) =>
+          sum +
+          (scene.complexityScore || 0),
+        0
+      ) / day.scenes.length
+    );
+
+  return {
+    actors,
+    props,
+    permissions,
+    avgComplexity,
+  };
+
+};
+  const toggleDaySection = (
+  dayNumber,
+  section
+) => {
+
+  const key =
+    `${dayNumber}-${section}`;
+
+  setExpandedShootSection(
+    prev => ({
+      ...prev,
+      [key]: !prev[key]
+    })
+  );
+
+};
+  
+
+ const [selectedScene,
+setSelectedScene] =
+useState(null);
 
   const [expandedSection,
   setExpandedSection] =
   useState(null);
+
+
+  const loadingMessages = [
+  "Reading screenplay...",
+  "Extracting scenes...",
+  "Identifying actors...",
+  "Detecting locations...",
+  "Finding props...",
+  "Calculating scene complexity...",
+  "Generating shoot plan...",
+  "Finalizing production report..."
+];
+
+
+  const changeTab = (tabId) => {
+
+  setActiveTab(tabId);
+  setCurrentPage(1);
+
+  setSelectedScene(null);
+
+  setExpandedActor(null);
+
+  setExpandedLocation(null);
+
+  setExpandedProp(null);
+
+  setExpandedShootDay(null);
+
+  setExpandedSection(null);
+
+  if(tabId === "scenes")
+    setSortMode("scriptOrder");
+  else
+    setSortMode("count");
+
+};
+
+const paginate = (
+  items,
+  page,
+  pageSize
+) => {
+
+  const start =
+    (page - 1) *
+    pageSize;
+
+  return items.slice(
+    start,
+    start + pageSize
+  );
+
+};
+
+const [loadingStep, setLoadingStep] =
+  useState(0);
+
+  useEffect(() => {
+
+  if (!isUploading) {
+    setLoadingStep(0);
+    return;
+  }
+
+  const interval = setInterval(() => {
+
+    setLoadingStep(
+      prev =>
+        (prev + 1) %
+        loadingMessages.length
+    );
+
+  }, 1800);
+
+  return () =>
+    clearInterval(interval);
+
+}, [isUploading]);
 
   const actors = getUniqueActors(scenes);
   const props = getUniqueProps(scenes);
   const costumes = getUniqueCostumes(scenes);
   const locations = getUniqueLocations(scenes);
   const locationGroups = getLocationGroups(scenes);
+const filteredLocations =
+  [...locations]
+    .filter(location =>
+      location
+        .toLowerCase()
+        .includes(
+          searchTerm.toLowerCase()
+        )
+    )
+    .sort((a,b) => {
+
+      const aCount =
+        scenes.filter(
+          scene =>
+            scene.location === a
+        ).length;
+
+      const bCount =
+        scenes.filter(
+          scene =>
+            scene.location === b
+        ).length;
+
+      if(sortMode === "az")
+        return a.localeCompare(b);
+
+      if(sortMode === "za")
+        return b.localeCompare(a);
+
+      return bCount - aCount;
+
+    });
+  
+    const getPropScenes = (
+  prop,
+  scenes
+) => {
+
+  return scenes.filter(
+    scene =>
+      scene.props?.includes(prop)
+  );
+
+};
+
+    const filteredProps =
+  [...props]
+    .filter(prop =>
+      prop
+        .toLowerCase()
+        .includes(
+          searchTerm.toLowerCase()
+        )
+    )
+    .sort((a,b)=>{
+
+      const aCount =
+        getPropScenes(
+          a,
+          scenes
+        ).length;
+
+      const bCount =
+        getPropScenes(
+          b,
+          scenes
+        ).length;
+
+      if(sortMode==="az")
+        return a.localeCompare(b);
+
+      if(sortMode==="za")
+        return b.localeCompare(a);
+
+      return bCount - aCount;
+
+    });
+
+    const filteredScenes =
+  [...scenes]
+    .filter(scene => {
+
+      const q =
+        searchTerm
+          .toLowerCase();
+
+      return (
+
+        scene.title
+          ?.toLowerCase()
+          .includes(q)
+
+        ||
+
+        scene.location
+          ?.toLowerCase()
+          .includes(q)
+
+        ||
+
+        scene.actors
+          ?.some(actor =>
+            actor
+              .toLowerCase()
+              .includes(q)
+          )
+
+      );
+
+    })
+    .sort((a,b)=>{
+
+  if(sortMode==="complexityDesc")
+    return (
+      b.complexityScore -
+      a.complexityScore
+    );
+
+  if(sortMode==="complexityAsc")
+    return (
+      a.complexityScore -
+      b.complexityScore
+    );
+
+  return (
+    a.sceneNumber -
+    b.sceneNumber
+  );
+
+});
+
+  
+    const filteredShootPlan =
+  shootPlan.filter(day =>
+
+    day.location
+      ?.toLowerCase()
+      .includes(
+        searchTerm.toLowerCase()
+      )
+
+  );
 
   const sortedActors =
   [...actors]
@@ -115,17 +441,7 @@ const [expandedShootDay, setExpandedShootDay] =
 
     });
 
-    const getPropScenes = (
-  prop,
-  scenes
-) => {
-
-  return scenes.filter(
-    scene =>
-      scene.props?.includes(prop)
-  );
-
-};
+    
 
 
   const handleUpload = async () => {
@@ -151,11 +467,86 @@ const [expandedShootDay, setExpandedShootDay] =
     }
   };
 
+  const fileInputRef = useRef(null);
+  const clearSelectedFile = () => {
+  setSelectedFile(null);
+  setUploadResponse(null);
+  setError(null);
+
+  if (fileInputRef.current) {
+    fileInputRef.current.value = "";
+  }
+};
+  const hasAnalysis =
+  scenes.length > 0;
   const sceneCount = scenes.length;
   const actorCount = actors.length;
   const locationCount = locations.length;
   const propCount = props.length;
 
+
+const paginatedScenes =
+  paginate(
+    filteredScenes,
+    currentPage,
+    10
+  );
+
+  const paginatedActors =
+  paginate(
+    sortedActors,
+    currentPage,
+    12
+  );
+
+  const paginatedLocations =
+  paginate(
+    filteredLocations,
+    currentPage,
+    12
+  );
+
+  const paginatedProps =
+  paginate(
+    filteredProps,
+    currentPage,
+    12
+  );
+
+  const activeItems =
+
+  activeTab === "scenes"
+    ? filteredScenes
+
+  : activeTab === "actors"
+    ? sortedActors
+
+  : activeTab === "locations"
+    ? filteredLocations
+
+  : filteredProps;
+
+const pageSize =
+
+  activeTab === "scenes"
+    ? 10
+    : 12;
+
+const totalPages =
+  Math.ceil(
+    activeItems.length /
+    pageSize
+  );
+
+  const downloadPdf =
+  async () => {
+
+    window.open(
+      `${API_URL}/export-pdf`,
+       "_blank"
+    );
+
+  };
   return (
   <div className="app">
 
@@ -179,30 +570,22 @@ const [expandedShootDay, setExpandedShootDay] =
 
 <div className="upload-card">
 
-  <div className="file-info">
+  <div className="upload-info">
 
-    {/* <div className="file-icon">
-      📄
-    </div> */}
+    <div className="upload-title">
+      {
+        selectedFile
+          ? selectedFile.name
+          : "Upload screenplay PDF"
+      }
+    </div>
 
-    <div>
-
-      <div className="file-name">
-        {
-          selectedFile
-            ? selectedFile.name
-            : "Upload screenplay"
-        }
-      </div>
-
-      {/* <div className="file-status">
-        {
-          selectedFile
-            ? "Ready for AI analysis"
-            : "Select a screenplay PDF to begin"
-        }
-      </div> */}
-
+    <div className="upload-subtitle">
+      {
+        selectedFile
+          ? "Ready for AI analysis"
+          : "Select a screenplay to generate breakdowns"
+      }
     </div>
 
   </div>
@@ -210,9 +593,10 @@ const [expandedShootDay, setExpandedShootDay] =
   <div className="upload-actions">
 
     <input
-      id="script-upload"
+      ref={fileInputRef}
       type="file"
       accept=".pdf"
+      id="script-upload"
       hidden
       onChange={(e) =>
         setSelectedFile(
@@ -223,18 +607,26 @@ const [expandedShootDay, setExpandedShootDay] =
 
     <label
       htmlFor="script-upload"
-      className="browse-btn"
+      className="secondary-btn"
     >
-      Browse Script
+      {
+        selectedFile
+          ? "Change File"
+          : "Browse Script"
+      }
     </label>
 
     <button
-      className="analyze-btn"
-      onClick={handleUpload}
+      className="primary-btn"
       disabled={
-        isUploading ||
-        !selectedFile
+        !selectedFile || isUploading
       }
+      title={
+        !selectedFile
+          ? "Select a screenplay PDF first"
+          : ""
+      }
+      onClick={handleUpload}
     >
       {
         isUploading
@@ -243,9 +635,49 @@ const [expandedShootDay, setExpandedShootDay] =
       }
     </button>
 
+
+{hasAnalysis && (<button
+  onClick={downloadPdf}
+>
+  Export PDF
+</button>)}
+
+    {
+      selectedFile && (
+        <button
+          className="danger-btn"
+          onClick={clearSelectedFile}
+        >
+          ✕
+        </button>
+      )
+    }
+
   </div>
 
 </div>
+
+{
+  !hasAnalysis && (
+    <div className="empty-state">
+
+      <div className="empty-icon">
+        🎬
+      </div>
+
+      <h3>
+        Upload a screenplay to begin
+      </h3>
+
+      <p>
+        Script2Shoot will extract scenes,
+        actors, props, locations and
+        generate a suggested shoot plan.
+      </p>
+
+    </div>
+  )
+}
   
 </header>
 {sceneCount > 0 && (
@@ -273,12 +705,15 @@ const [expandedShootDay, setExpandedShootDay] =
 
 </section>
 )}
-      <section className="tabs">
+{ hasAnalysis &&(
+
+      <div className="tabs-toolbar">
+        <section className="tabs">
 
         <Tab
           id="scenes"
           active={activeTab==="scenes"}
-          onClick={setActiveTab}
+          onClick={changeTab}
         >
           Scenes
         </Tab>
@@ -286,7 +721,7 @@ const [expandedShootDay, setExpandedShootDay] =
         <Tab
           id="actors"
           active={activeTab==="actors"}
-          onClick={setActiveTab}
+          onClick={changeTab}
         >
           Actors
         </Tab>
@@ -294,7 +729,7 @@ const [expandedShootDay, setExpandedShootDay] =
         <Tab
           id="locations"
           active={activeTab==="locations"}
-          onClick={setActiveTab}
+          onClick={changeTab}
         >
           Locations
         </Tab>
@@ -302,7 +737,7 @@ const [expandedShootDay, setExpandedShootDay] =
         <Tab
           id="props"
           active={activeTab==="props"}
-          onClick={setActiveTab}
+          onClick={changeTab}
         >
           Props
         </Tab>
@@ -310,67 +745,198 @@ const [expandedShootDay, setExpandedShootDay] =
         <Tab
           id="shoot"
           active={activeTab==="shoot"}
-          onClick={setActiveTab}
+          onClick={changeTab}
         >
           Shoot Plan
         </Tab>
 
       </section>
-      <div className="toolbar">
+      {activeTab !== "shoot" 
+        &&(
+          <div className="toolbar">
+<input
+      type="text"
+      className="search-input"
+      placeholder={
+        activeTab === "actors"
+          ? "Search actors..."
+          : activeTab === "locations"
+          ? "Search locations..."
+          : activeTab === "props"
+          ? "Search props..."
+          : "Search..."
+      }
+      value={searchTerm}
+      onChange={(e) =>
+        setSearchTerm(
+          e.target.value
+        )
+      }
+    />
 
-  <input
-    className="search-input"
-    type="text"
-    placeholder="Search actors, locations, props..."
-    value={searchTerm}
-    onChange={(e) =>
-      setSearchTerm(e.target.value)
-    }
-  />
+    <select
+      className="sort-select"
+      value={sortMode}
+      onChange={(e) =>
+        setSortMode(
+          e.target.value
+        )
+      }
+    >
+       {activeTab === "scenes" ? (
+    <>
+      <option value="scriptOrder">
+        Scene Order
+      </option>
 
-  <select
-    className="sort-select"
-    value={sortMode}
-    onChange={(e) =>
-      setSortMode(e.target.value)
-    }
-  >
-    <option value="count">
-      Most Used
-    </option>
+      <option value="complexityDesc">
+        Complexity ↓
+      </option>
 
-    <option value="az">
-      A → Z
-    </option>
+      <option value="complexityAsc">
+        Complexity ↑
+      </option>
+    </>
+  ) : (
+    <>
+      <option value="count">
+        Most Used
+      </option>
 
-    <option value="za">
-      Z → A
-    </option>
-  </select>
+      <option value="az">
+        A-Z
+      </option>
 
-</div>
+      <option value="za">
+        Z-A
+      </option>
+    </>
+  )}
 
-      <main className="content">
+    </select>
+  </div>
+        )
+      }
+      </div>
+)}
 
-        {activeTab === "scenes" && (
+      {hasAnalysis && (
+        <main className="content">
+{activeTab === "scenes" && (
 
   <>
 
-    {scenes.map((scene) => (
+    {paginatedScenes.map(scene => (
 
-      <ItemCard
+      <div
         key={scene.sceneNumber}
-        left={scene.sceneNumber}
-        title={
-          scene.title ||
-          scene.slugline
+        className="item-card clickable"
+        onClick={() =>
+          setExpandedSection(
+            expandedSection === scene.sceneNumber
+              ? null
+              : scene.sceneNumber
+          )
         }
-        sub={
-  `📍 ${scene.location}
-   • 👥 ${scene.actors.length} actors
-   • ⚡ Complexity ${scene.complexityScore}`
-}
-      />
+      >
+
+        <div className="item-left">
+          {scene.sceneNumber}
+        </div>
+
+        <div className="item-main">
+
+          <div className="item-title">
+            {scene.title}
+          </div>
+
+          <div className="item-sub">
+
+            📍 {scene.location}
+            {" • "}
+            👥 {scene.actors.length} actors
+            {" • "}
+            ⚡ {scene.complexityScore}/10
+
+          </div>
+
+          {
+            expandedSection ===
+            scene.sceneNumber && (
+
+              <div className="scene-detail-card">
+
+                {scene.actors?.length > 0 && (
+                  <>
+                    <h4>Actors</h4>
+
+                    <div className="tag-container">
+
+                      {scene.actors.map(actor => (
+
+                        <span
+                          key={actor}
+                          className="tag"
+                        >
+                          {actor}
+                        </span>
+
+                      ))}
+
+                    </div>
+                  </>
+                )}
+
+                {scene.props?.length > 0 && (
+                  <>
+                    <h4>Props</h4>
+
+                    <div className="tag-container">
+
+                      {scene.props.map(prop => (
+
+                        <span
+                          key={prop}
+                          className="tag"
+                        >
+                          {prop}
+                        </span>
+
+                      ))}
+
+                    </div>
+                  </>
+                )}
+
+                {scene.specialRequirements?.length > 0 && (
+                  <>
+                    <h4>Requirements</h4>
+
+                    <div className="tag-container">
+
+                      {scene.specialRequirements.map(req => (
+
+                        <span
+                          key={req}
+                          className="tag"
+                        >
+                          {req}
+                        </span>
+
+                      ))}
+
+                    </div>
+                  </>
+                )}
+
+              </div>
+
+            )
+          }
+
+        </div>
+
+      </div>
 
     ))}
 
@@ -382,7 +948,7 @@ const [expandedShootDay, setExpandedShootDay] =
 
   <>
 
-    {sortedActors.map(actor => {
+    {paginatedActors.map(actor => {
 
   const actorScenes =
   getActorScenes(
@@ -395,12 +961,16 @@ const [expandedShootDay, setExpandedShootDay] =
     <div
       key={actor}
       className="item-card clickable"
-      onClick={() =>
+      onClick={() =>{
+
+         setSelectedScene(null);
+
         setExpandedActor(
           expandedActor === actor
             ? null
             : actor
         )
+      }
       }
     >
 
@@ -415,26 +985,73 @@ const [expandedShootDay, setExpandedShootDay] =
         </div>
 
         {
-          expandedActor === actor &&
-          (
-            <div className="tag-container">
+  expandedActor === actor && (
+    <>
 
-              {
-                actorScenes.map(scene => (
+      <div className="tag-container">
 
-                  <span
-                    key={scene.sceneNumber}
-                    className="tag"
-                  >
-                    Scene {scene.sceneNumber}
-                  </span>
+        {actorScenes.map(scene => (
 
-                ))
-              }
+          <span
+            key={scene.sceneNumber}
+            className="tag clickable-tag"
+            onClick={(e) => {
 
-            </div>
-          )
-        }
+              e.stopPropagation();
+
+              setSelectedScene(
+  selectedScene?.sceneNumber ===
+  scene.sceneNumber
+    ? null
+    : scene
+);
+
+            }}
+          >
+            Scene {scene.sceneNumber}
+          </span>
+
+        ))}
+
+      </div>
+
+      {selectedScene && (
+
+        <div className="scene-detail-card">
+
+          {actorScenes
+            .filter(
+              scene =>
+                scene.sceneNumber === selectedScene?.sceneNumber
+            )
+            .map(scene => (
+
+              <div
+                key={scene.sceneNumber}
+              >
+
+                <h4>{scene.title}</h4>
+
+                <p>
+                  📍 {scene.location}
+                </p>
+
+                <p>
+                  Complexity:
+                  {scene.complexityScore}
+                </p>
+
+              </div>
+
+            ))}
+
+        </div>
+
+      )}
+
+    </>
+  )
+}
 
       </div>
 
@@ -452,7 +1069,7 @@ const [expandedShootDay, setExpandedShootDay] =
 
   <>
 
-   {locations.map(location => {
+   {paginatedLocations.map(location => {
 
   const locationScenes =
     scenes.filter(
@@ -465,12 +1082,15 @@ const [expandedShootDay, setExpandedShootDay] =
     <div
       key={location}
       className="item-card clickable"
-      onClick={() =>
+      onClick={() =>{
+
+        setSelectedScene(null);
         setExpandedLocation(
           expandedLocation === location
             ? null
             : location
         )
+      }
       }
     >
 
@@ -485,33 +1105,68 @@ const [expandedShootDay, setExpandedShootDay] =
         </div>
 
         {
-          expandedLocation === location &&
-          (
-            <div className="tag-container">
+  expandedLocation === location && (
+    <>
 
-              {
-                locationScenes.map(scene => (
+      <div className="tag-container">
 
-                  <span
-                    key={scene.sceneNumber}
-                    className="tag"
-                    onClick={(e) => {
+        {locationScenes.map(scene => (
 
-    e.stopPropagation();
+          <span
+            key={scene.sceneNumber}
+            className="tag clickable-tag"
+            onClick={(e) => {
 
-    setSelectedScene(scene);
+              e.stopPropagation();
 
-  }}
-                  >
-                    Scene {scene.sceneNumber}
-                  </span>
+              setSelectedScene(
+                selectedScene?.sceneNumber ===
+                scene.sceneNumber
+                  ? null
+                  : scene
+              );
 
-                ))
-              }
+            }}
+          >
+            Scene {scene.sceneNumber}
+          </span>
 
-            </div>
-          )
-        }
+        ))}
+
+      </div>
+
+      {
+        selectedScene &&
+        locationScenes.some(
+          s =>
+            s.sceneNumber ===
+            selectedScene.sceneNumber
+        ) && (
+
+          <div className="scene-detail-card">
+
+            <h4>
+              {selectedScene.title}
+            </h4>
+
+            <p>
+              📍 {selectedScene.location}
+            </p>
+
+            <p>
+              Complexity:
+              {" "}
+              {selectedScene.complexityScore}
+            </p>
+
+          </div>
+
+        )
+      }
+
+    </>
+  )
+}
 
       </div>
 
@@ -529,7 +1184,7 @@ const [expandedShootDay, setExpandedShootDay] =
 
   <>
 
-    {props.map(prop => {
+    {paginatedProps.map(prop => {
 
   const propScenes =
     getPropScenes(
@@ -542,12 +1197,15 @@ const [expandedShootDay, setExpandedShootDay] =
     <div
       key={prop}
       className="item-card clickable"
-      onClick={() =>
+      onClick={() =>{
+
+        setSelectedScene(null);
         setExpandedProp(
           expandedProp === prop
             ? null
             : prop
         )
+      }
       }
     >
 
@@ -562,26 +1220,68 @@ const [expandedShootDay, setExpandedShootDay] =
         </div>
 
         {
-          expandedProp === prop &&
-          (
-            <div className="tag-container">
+  expandedProp === prop && (
+    <>
 
-              {
-                propScenes.map(scene => (
+      <div className="tag-container">
 
-                  <span
-                    key={scene.sceneNumber}
-                    className="tag"
-                  >
-                    Scene {scene.sceneNumber}
-                  </span>
+        {propScenes.map(scene => (
 
-                ))
-              }
+          <span
+            key={scene.sceneNumber}
+            className="tag clickable-tag"
+            onClick={(e) => {
 
-            </div>
-          )
-        }
+              e.stopPropagation();
+
+              setSelectedScene(
+                selectedScene?.sceneNumber ===
+                scene.sceneNumber
+                  ? null
+                  : scene
+              );
+
+            }}
+          >
+            Scene {scene.sceneNumber}
+          </span>
+
+        ))}
+
+      </div>
+
+      {
+        selectedScene &&
+        propScenes.some(
+          s =>
+            s.sceneNumber ===
+            selectedScene.sceneNumber
+        ) && (
+
+          <div className="scene-detail-card">
+
+            <h4>
+              {selectedScene.title}
+            </h4>
+
+            <p>
+              📍 {selectedScene.location}
+            </p>
+
+            <p>
+              Complexity:
+              {" "}
+              {selectedScene.complexityScore}
+            </p>
+
+          </div>
+
+        )
+      }
+
+    </>
+  )
+}
 
       </div>
 
@@ -599,129 +1299,169 @@ const [expandedShootDay, setExpandedShootDay] =
 
   <div className="shoot-grid">
 
-    {shootPlan.map((day, index) => {
+    {filteredShootPlan.map(day => {
 
-  const dayKey =
-    `day-${index}`;
+      const summary =
+        getDaySummary(day);
 
-  const expanded =
-    expandedShootDay === dayKey;
+      return (
 
-  return (
+        <div
+          key={day.day}
+          className="shoot-day-card"
+        >
 
-    <div
-      key={dayKey}
-      className="card shoot-card"
-    >
+          <div className="day-header">
 
-      <div
-        className="shoot-header"
-        onClick={() =>
-          setExpandedShootDay(
-            expanded
-              ? null
-              : dayKey
-          )
-        }
-      >
+            <h2>
+              DAY {day.day}
+            </h2>
 
-        <h3>
-          Day {index + 1}
-        </h3>
+            <p className="day-location">
+              📍 {day.location}
+            </p>
 
-        <span>
-          {day.location}
-        </span>
+          </div>
 
-      </div>
+          <div className="day-stats">
 
-      {
-        expanded &&
-        (
-          <>
+            <span className="day-stat">
+  🎬 {day.scenes.length} Scenes
+</span>
 
-            {/* SCENES */}
+            {summary.actors.length > 0 && (
+              <span>
+                👥 {summary.actors.length} Actors
+              </span>
+            )}
 
-            <div
-              className="shoot-section"
-              onClick={() =>
-                setExpandedSection(
-                  expandedSection ===
-                  `${dayKey}-scenes`
-                    ? null
-                    : `${dayKey}-scenes`
-                )
-              }
-            >
+            {summary.props.length > 0 && (
+              <span>
+                📦 {summary.props.length} Props
+              </span>
+            )}
 
-              ▼ Scenes
+<span
+  className={`day-stat complexity ${getComplexityClass(
+    summary.avgComplexity
+  )}`}
+>
+  ⚡ {summary.avgComplexity}/10
+</span>
 
-            </div>
+          </div>
 
-            {
-              expandedSection ===
-              `${dayKey}-scenes`
-              &&
-              (
-                <div className="tag-container">
+          {/* SCENES */}
 
-                  {
-                    day.scenes.map(
-                      scene => (
-
-                        <span
-                          key={
-                            scene.sceneNumber
-                          }
-                          className="tag"
-                        >
-                          Scene {
-                            scene.sceneNumber
-                          }
-                        </span>
-
-                      )
-                    )
-                  }
-
-                </div>
+          <button
+            className="collapse-row"
+            onClick={() =>
+              toggleDaySection(
+                day.day,
+                "scenes"
               )
             }
+          >
+            🎬 Scenes
+            ({day.scenes.length})
+          </button>
 
-            {/* ACTORS */}
+          {expandedShootSection?.[
+  `${day.day}-scenes`
+] && (
 
-            <div
-              className="shoot-section"
-              onClick={() =>
-                setExpandedSection(
-                  expandedSection ===
-                  `${dayKey}-actors`
-                    ? null
-                    : `${dayKey}-actors`
-                )
-              }
-            >
+  <>
 
-              ▼ Actors
+    <div className="collapse-content">
 
-            </div>
+      {day.scenes.map(scene => (
 
-            {
-              expandedSection ===
-              `${dayKey}-actors`
-              &&
-              (
-                <div className="tag-container">
+        <span
+          key={scene.sceneNumber}
+          className="tag clickable-tag"
+          onClick={() =>
 
-                  {
-                    [
-                      ...new Set(
-                        day.scenes.flatMap(
-                          scene =>
-                            scene.actors || []
-                        )
-                      )
-                    ].map(actor => (
+            setSelectedScene(
+
+              selectedScene?.sceneNumber ===
+              scene.sceneNumber
+
+                ? null
+
+                : scene
+
+            )
+
+          }
+        >
+          Scene {scene.sceneNumber}
+        </span>
+
+      ))}
+
+    </div>
+
+    {
+      selectedScene &&
+      day.scenes.some(
+        s =>
+          s.sceneNumber ===
+          selectedScene.sceneNumber
+      ) && (
+
+        <div className="scene-detail-card">
+
+          <h4>
+            {selectedScene.title}
+          </h4>
+
+          <p>
+            📍 {selectedScene.location}
+          </p>
+
+          <p>
+            Complexity:
+            {" "}
+            {selectedScene.complexityScore}
+          </p>
+
+        </div>
+
+      )
+    }
+
+  </>
+
+)}
+          
+
+          {/* ACTORS */}
+
+          {summary.actors.length > 0 && (
+
+            <>
+
+              <button
+                className="collapse-row"
+                onClick={() =>
+                  toggleDaySection(
+                    day.day,
+                    "actors"
+                  )
+                }
+              >
+                👥 Actors
+                ({summary.actors.length})
+              </button>
+
+              {expandedShootSection?.[
+                `${day.day}-actors`
+              ] && (
+
+                <div className="collapse-content">
+
+                  {summary.actors.map(
+                    actor => (
 
                       <span
                         key={actor}
@@ -730,47 +1470,44 @@ const [expandedShootDay, setExpandedShootDay] =
                         {actor}
                       </span>
 
-                    ))
-                  }
+                    )
+                  )}
 
                 </div>
-              )
-            }
 
-            {/* PROPS */}
+              )}
 
-            <div
-              className="shoot-section"
-              onClick={() =>
-                setExpandedSection(
-                  expandedSection ===
-                  `${dayKey}-props`
-                    ? null
-                    : `${dayKey}-props`
-                )
-              }
-            >
+            </>
 
-              ▼ Props
+          )}
 
-            </div>
+          {/* PROPS */}
 
-            {
-              expandedSection ===
-              `${dayKey}-props`
-              &&
-              (
-                <div className="tag-container">
+          {summary.props.length > 0 && (
 
-                  {
-                    [
-                      ...new Set(
-                        day.scenes.flatMap(
-                          scene =>
-                            scene.props || []
-                        )
-                      )
-                    ].map(prop => (
+            <>
+
+              <button
+                className="collapse-row"
+                onClick={() =>
+                  toggleDaySection(
+                    day.day,
+                    "props"
+                  )
+                }
+              >
+                📦 Props
+                ({summary.props.length})
+              </button>
+
+              {expandedShootSection?.[
+                `${day.day}-props`
+              ] && (
+
+                <div className="collapse-content">
+
+                  {summary.props.map(
+                    prop => (
 
                       <span
                         key={prop}
@@ -779,102 +1516,187 @@ const [expandedShootDay, setExpandedShootDay] =
                         {prop}
                       </span>
 
-                    ))
-                  }
+                    )
+                  )}
 
                 </div>
-              )
-            }
 
-          </>
-        )
-      }
+              )}
 
-    </div>
+            </>
 
-  );
+          )}
 
-})}
+          {/* PERMISSIONS */}
+
+          {summary.permissions.length > 0 && (
+
+            <>
+
+              <button
+                className="collapse-row"
+                onClick={() =>
+                  toggleDaySection(
+                    day.day,
+                    "permissions"
+                  )
+                }
+              >
+                ⚠ Requirements
+                ({summary.permissions.length})
+              </button>
+
+              {expandedShootSection?.[
+                `${day.day}-permissions`
+              ] && (
+
+                <div className="collapse-content">
+
+                  {summary.permissions.map(
+                    item => (
+
+                      <span
+                        key={item}
+                        className="tag"
+                      >
+                        {item}
+                      </span>
+
+                    )
+                  )}
+
+                </div>
+                
+
+              )}
+
+            </>
+
+          )}
+
+          {/* AI NOTE */}
+
+          <div className="ai-note">
+
+            <strong>
+              🤖 AI Suggestion
+            </strong>
+
+            <p>
+
+  {summary.avgComplexity <= 3 &&
+    "Low complexity shoot. Suitable for a smaller crew."}
+
+  {summary.avgComplexity > 3 &&
+   summary.avgComplexity <= 6 &&
+    "Moderate production requirements. Plan equipment and crew in advance."}
+
+  {summary.avgComplexity > 6 &&
+    "High complexity shoot. Additional coordination recommended."}
+
+</p>
+
+          </div>
+
+        </div>
+
+      );
+
+    })}
 
   </div>
 
 )}
 
-<aside className="inspector">
+{activeTab !== "shoot" && totalPages > 1 && (
 
-    {selectedScene ? (
+  <div className="pagination">
 
-      <>
+    <button
+      disabled={currentPage === 1}
+      onClick={() =>
+        setCurrentPage(
+          p => p - 1
+        )
+      }
+    >
+      ← Previous
+    </button>
+
+    <span>
+      Page {currentPage}
+      {" / "}
+      {totalPages}
+    </span>
+
+    <button
+      disabled={
+        currentPage === totalPages
+      }
+      onClick={() =>
+        setCurrentPage(
+          p => p + 1
+        )
+      }
+    >
+      Next →
+    </button>
+
+  </div>
+
+)}
+
+      </main>
+      )}
+
+      {
+  isUploading && (
+
+    <div className="loading-overlay">
+
+      <div className="loading-card">
+
+        <div className="spinner"></div>
+
         <h3>
-          Scene {selectedScene.sceneNumber}
+          AI Production Analysis
         </h3>
 
-        <p className="inspector-title">
-          {selectedScene.title}
+        <p className="loading-message">
+          {
+            loadingMessages[
+              loadingStep
+            ]
+          }
         </p>
 
-        <div className="inspector-block">
-          <strong>Location</strong>
-          <p>{selectedScene.location}</p>
+        <div className="loading-progress">
+
+          {
+            loadingMessages.map(
+              (msg, index) => (
+
+                <div
+                  key={msg}
+                  className={
+                    index <= loadingStep
+                      ? "progress-dot active"
+                      : "progress-dot"
+                  }
+                />
+
+              )
+            )
+          }
+
         </div>
-
-        <div className="inspector-block">
-          <strong>Complexity</strong>
-          <p>
-            {selectedScene.complexityScore}/10
-          </p>
-        </div>
-
-        <div className="inspector-block">
-          <strong>Actors</strong>
-
-          <div className="tag-container">
-            {selectedScene.actors?.map(actor => (
-              <span
-                key={actor}
-                className="tag"
-              >
-                {actor}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="inspector-block">
-          <strong>Props</strong>
-
-          <div className="tag-container">
-            {selectedScene.props?.map(prop => (
-              <span
-                key={prop}
-                className="tag"
-              >
-                {prop}
-              </span>
-            ))}
-          </div>
-        </div>
-
-      </>
-
-    ) : (
-
-      <div className="empty-inspector">
-
-        <h3>Scene Inspector</h3>
-
-        <p>
-          Select a scene tag to inspect
-          details.
-        </p>
 
       </div>
 
-    )}
+    </div>
 
-  </aside>
-
-      </main>
+  )
+}
 
     </div>
 
